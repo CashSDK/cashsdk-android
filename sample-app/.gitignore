@@ -1,0 +1,13 @@
+# Build + tooling
+build/
+.gradle/
+.kotlin/
+local.properties
+
+# Signing — the upload key and its passwords never go in git
+*.jks
+*.keystore
+keystore.properties
+
+# The SDK artifact is a build output of the sibling library, copied in, not source
+app/libs/*.aar

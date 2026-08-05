@@ -1,0 +1,24 @@
+# Gradle / Android SDK scaffold — keep build artifacts and local machine config out of git.
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android / IDE
+local.properties
+*.iml
+.idea/
+captures/
+.cxx/
+
+# Kotlin
+.kotlin/
+
+# OS
+.DS_Store
+
+# Signing / secrets (never commit)
+*.keystore
+*.jks
+keystore.properties
