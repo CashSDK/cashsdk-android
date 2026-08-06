@@ -1,0 +1,15 @@
+# JitPack build configuration.
+#
+# JitPack builds this repo from a git tag on demand and serves the result as
+#   implementation("com.github.cashsdk:cashsdk-android:<tag>")
+#
+# Without this file JitPack picks its default JDK (11), and the build fails: the library
+# targets Java 17 (`jvmToolchain(17)`) and Android Gradle Plugin 8.5 requires 17 to run at all.
+jdk:
+  - openjdk17
+
+install:
+  # `publishToMavenLocal` is what JitPack harvests — it produces the AAR, the sources jar,
+  # the javadoc jar and the POM into ~/.m2, which is exactly the set a consumer resolves.
+  # Signing is skipped automatically: no signing key is present in the JitPack environment.
+  - ./gradlew clean testDebugUnitTest publishToMavenLocal --no-daemon
