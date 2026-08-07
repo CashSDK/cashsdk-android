@@ -6,7 +6,7 @@ Play Billing 9. The Android counterpart to `docs/08-IOS-SDK.md`.
 
 > ### Status
 > The public API, the Billing 9 engine, the offline-first entitlement cache and the Compose
-> paywall renderer are implemented and covered by **49 unit tests** (`./gradlew
+> paywall renderer are implemented and covered by **55 unit tests** (`./gradlew
 > testDebugUnitTest`, green). `assembleRelease` produces the `.aar`. It has **not yet been
 > exercised on a real device or against a live Play Billing purchase** — see
 > [Status](#status) at the bottom for exactly what is done and what is still open.
@@ -19,7 +19,7 @@ Play Billing 9. The Android counterpart to `docs/08-IOS-SDK.md`.
 |---|---|
 | minSdk | 24 (Android 7.0) |
 | compileSdk / targetSdk | 35 |
-| Language | Kotlin 2.0, Java 17 toolchain |
+| Language | Kotlin 2.3, Java 17 toolchain |
 | UI | Jetpack Compose (Material 3) |
 | Billing | `com.android.billingclient:billing-ktx:9.1.0` |
 | Networking | `HttpURLConnection` on `Dispatchers.IO` (no OkHttp/Retrofit) |
@@ -35,7 +35,7 @@ host apps.
 
 ### Option A — Gradle dependency (recommended)
 
-Add the JitPack repository, then the dependency:
+Add Maven Central, the Java 17 toolchain, then the dependency:
 
 ```kotlin
 // settings.gradle.kts
@@ -49,6 +49,17 @@ dependencyResolutionManagement {
 
 ```kotlin
 // app/build.gradle.kts
+android {
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation("com.cashsdk:cashsdk-android:1.2.0")
 }
