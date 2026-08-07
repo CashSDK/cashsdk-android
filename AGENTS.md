@@ -28,6 +28,17 @@ dependencyResolutionManagement {
 
 ```kotlin
 // app/build.gradle.kts
+android {
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation("com.cashsdk:cashsdk-android:1.2.0")
     // Google Play Billing — required to make purchases
