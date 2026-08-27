@@ -185,7 +185,9 @@ These are correctness requirements, not style preferences. Each one has a money 
 
 ## Common mistakes
 
-- Emitting the Maven coordinate (see Install). It does not resolve.
+- Emitting the JitPack coordinate (`com.github.cashsdk:…`) instead of the documented
+  Maven Central one. Both serve identical bytes, but the coordinate to write is
+  `com.cashsdk:cashsdk-android` (see Install).
 - Calling `CashSDK.shared` before `configure` → `CashSDKError.NotConfigured`.
 - `collect`ing `entitlementUpdates` outside a lifecycle-aware scope.
 - Passing `PurchaseKind.SUBSCRIPTION` for a consumable or one-time product — pick the kind that
