@@ -1,5 +1,6 @@
 package com.cashsdk
 
+import com.cashsdk.model.PackageProduct
 import com.cashsdk.model.Entitlements
 import com.cashsdk.model.EventBatch
 import com.cashsdk.model.EventInput
@@ -33,6 +34,16 @@ import org.junit.Test
 class WireContractTest {
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    @Test fun candidateOfferingKeepsZeroTrialAndUnknownEligibility() {
+        for (plan in listOf("weekly", "monthly", "yearly")) {
+            val trial = if (plan == "weekly") "null" else "0"
+            val body = """{"id":"$plan","identifier":"bet.midgame.$plan","store":"app-store","type":"auto_renewable","trialPrice":$trial,"eligibility":"unknown","offerSyncStatus":"verified"}"""
+            val product = json.decodeFromString<PackageProduct>(body)
+            assertEquals(if (plan == "weekly") null else 0, product.trialPrice)
+            assertEquals("unknown", product.eligibility)
+        }
+    }
 
     // ── Captured bodies: POST /v1/purchases:verify ──────────────────────────────
 
@@ -171,12 +182,12 @@ class WireContractTest {
     // ── 4. belongsToAnotherAccount / share semantics ────────────────────────────
 
     @Test
-    fun belongsToAnotherAccountIsNotAnError() {
+    fun anotherAccountsReceiptMustNotLookLikeASuccessfulGrant() {
         val decoded = json.decodeFromString<Entitlements>(belongsToAnother)
         assertTrue("the transaction was accepted", decoded.belongsToAnotherAccount)
         assertEquals(
-            "it is informational, not a failure — the caller WAS identified",
-            VerifyDecision.GRANTED,
+            "identified does not mean the restore policy granted the purchase to this caller",
+            VerifyDecision.OWNED_ELSEWHERE,
             VerifyDecision.of(VerifyAttribution.isAttributed(belongsToAnother, decoded), decoded),
         )
     }

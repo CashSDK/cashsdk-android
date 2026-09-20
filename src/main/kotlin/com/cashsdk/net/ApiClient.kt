@@ -51,16 +51,33 @@ internal class ApiClient(
     private val entitlementEtag: () -> String? = { null },
 ) {
     /** Set/cleared by the facade on identify/logout; sent as `X-CashSDK-User-Id`. */
-    @Volatile
-    var userId: String? = null
+    private val identity = RequestIdentity()
+    val userId: String? get() = identity.current.userId
 
     /**
      * The backend-minted signed user token, sent as `X-CashSDK-User-Token`. Production TRUSTS
      * only this (the raw id header is honoured only outside production), so without it every
      * identified verify/entitlement/consumable call is rejected live. Set via `identify(...)`.
      */
-    @Volatile
-    var userToken: String? = null
+    val userToken: String? get() = identity.current.userToken
+
+    fun setIdentity(userId: String?, userToken: String?) = identity.set(userId, userToken)
+
+    fun identitySnapshot(): RequestIdentity.Snapshot = identity.current
+
+    fun isCurrentIdentity(snapshot: RequestIdentity.Snapshot): Boolean = identity.isCurrent(snapshot)
+
+    fun requireIdentity(snapshot: RequestIdentity.Snapshot) {
+        if (snapshot.userId == null || !identity.isCurrent(snapshot)) throw CashSDKError.NotIdentified
+    }
+
+    fun requireValidUserToken(snapshot: RequestIdentity.Snapshot) {
+        requireIdentity(snapshot)
+        val host = URL(config.normalizedBase).host
+        if (host !in setOf("localhost", "127.0.0.1", "10.0.2.2", "[::1]")) {
+            requireFreshUserToken(snapshot.userId!!, snapshot.userToken)
+        }
+    }
 
     /**
      * The store environment sent as `X-CashSDK-Environment` (`Sandbox` | `Production`).
@@ -197,39 +214,48 @@ internal class ApiClient(
         path: String,
         body: String?,
         ifNoneMatch: String?,
-    ): RawResponse = withContext(Dispatchers.IO) {
-        val conn = (URL(config.normalizedBase + path).openConnection() as HttpURLConnection)
-        try {
-            conn.requestMethod = method
-            conn.connectTimeout = CONNECT_TIMEOUT_MS
-            conn.readTimeout = READ_TIMEOUT_MS
-            conn.instanceFollowRedirects = false
-            conn.setRequestProperty("Authorization", "Bearer ${config.publishableKey}")
-            conn.setRequestProperty("Accept", "application/json")
-            conn.setRequestProperty("X-CashSDK-Platform", "android")
-            conn.setRequestProperty("X-CashSDK-Sdk-Version", CASHSDK_VERSION)
-            userId?.let { conn.setRequestProperty("X-CashSDK-User-Id", it) }
-            userToken?.let { conn.setRequestProperty("X-CashSDK-User-Token", it) }
-            environment?.let { conn.setRequestProperty("X-CashSDK-Environment", it) }
-            ifNoneMatch?.let { conn.setRequestProperty("If-None-Match", it) }
+    ): RawResponse {
+        val requestIdentity = identity.current
+        val requestEnvironment = environment
+        return withContext(Dispatchers.IO) {
+            if (!identity.isCurrent(requestIdentity)) throw CashSDKError.NotIdentified
+            val conn = (URL(config.normalizedBase + path).openConnection() as HttpURLConnection)
+            try {
+                conn.requestMethod = method
+                conn.connectTimeout = CONNECT_TIMEOUT_MS
+                conn.readTimeout = READ_TIMEOUT_MS
+                conn.instanceFollowRedirects = false
+                conn.useCaches = false
+                conn.setRequestProperty("Authorization", "Bearer ${config.publishableKey}")
+                conn.setRequestProperty("Accept", "application/json")
+                conn.setRequestProperty("X-CashSDK-Platform", "android")
+                conn.setRequestProperty("X-CashSDK-Sdk-Version", CASHSDK_VERSION)
+                requestIdentity.userId?.let { conn.setRequestProperty("X-CashSDK-User-Id", it) }
+                requestIdentity.userToken?.let { conn.setRequestProperty("X-CashSDK-User-Token", it) }
+                requestEnvironment?.let { conn.setRequestProperty("X-CashSDK-Environment", it) }
+                ifNoneMatch?.let { conn.setRequestProperty("If-None-Match", it) }
 
-            if (body != null) {
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                if (body != null) {
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                }
+
+                val status = conn.responseCode
+                val stream = if (status in 200..299) conn.inputStream else conn.errorStream
+                val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                if (!identity.isCurrent(requestIdentity) || requestEnvironment != environment) {
+                    throw CashSDKError.NotIdentified
+                }
+                RawResponse(status, text, conn.getHeaderField("ETag"))
+            } catch (e: CashSDKError) {
+                throw e
+            } catch (e: Exception) {
+                // No connectivity / timeout / TLS — a transport failure, not a server verdict.
+                throw CashSDKError.Network(e)
+            } finally {
+                conn.disconnect()
             }
-
-            val status = conn.responseCode
-            val stream = if (status in 200..299) conn.inputStream else conn.errorStream
-            val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            RawResponse(status, text, conn.getHeaderField("ETag"))
-        } catch (e: CashSDKError) {
-            throw e
-        } catch (e: Exception) {
-            // No connectivity / timeout / TLS — a transport failure, not a server verdict.
-            throw CashSDKError.Network(e)
-        } finally {
-            conn.disconnect()
         }
     }
 

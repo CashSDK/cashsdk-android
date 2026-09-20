@@ -1,6 +1,6 @@
 // CashSDK — Android library module.
 //
-// Idiomatic Android library (.aar): Kotlin 2.0, Jetpack Compose, coroutines,
+// Idiomatic Android library (.aar): Kotlin 2.3, Jetpack Compose, coroutines,
 // kotlinx.serialization, Google Play Billing 9. Dependency-minimal by design — no
 // OkHttp/Retrofit (networking is HttpURLConnection on Dispatchers.IO), no Moshi,
 // no DataStore (offline cache is SharedPreferences). See README "Scaffold status".
@@ -12,7 +12,7 @@
 plugins {
     id("com.android.library") version "8.7.3"
     id("org.jetbrains.kotlin.android") version "2.3.20"
-    // Kotlin 2.0 moved the Compose compiler into its own Gradle plugin.
+    // Kotlin 2.x keeps the Compose compiler in its own Gradle plugin.
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
     // Publishing: `maven-publish` produces the POM + artifacts every Maven-style repository

@@ -109,7 +109,7 @@ internal fun PaywallScreen(
                 busy = true
                 errorText = null
                 try {
-                    client.paywallPurchase(activity, productId, price.kind)
+                    client.paywallPurchase(activity, price)
                     // `variant` matters most on the CONVERSION event — it is what attributes
                     // revenue to an experiment arm server-side.
                     client.track(
@@ -123,8 +123,10 @@ internal fun PaywallScreen(
                     // User dismissed the Play sheet — stay on the paywall.
                 } catch (e: CashSDKError.PurchasePending) {
                     errorText = "Your purchase is pending approval."
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Throwable) {
-                    errorText = e.message ?: "Purchase failed. Please try again."
+                    errorText = purchaseErrorText(e)
                     client.track(
                         "purchase_failed",
                         placement = presentation.placement,
@@ -144,8 +146,10 @@ internal fun PaywallScreen(
                 try {
                     client.restore()
                     onDismiss()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Throwable) {
-                    errorText = e.message ?: "Nothing to restore."
+                    errorText = purchaseErrorText(e)
                 } finally {
                     busy = false
                 }
@@ -239,7 +243,7 @@ internal fun PaywallScreen(
                 // ── Primary CTA ────────────────────────────────────────────────
                 Button(
                     onClick = { buy(selected) },
-                    enabled = !busy && selected != null,
+                    enabled = !busy && prices[selected] != null,
                     shape = shape,
                     colors = ButtonDefaults.buttonColors(containerColor = accent),
                     modifier = Modifier
@@ -258,6 +262,15 @@ internal fun PaywallScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
+                }
+
+                if (prices[selected]?.phases?.any { it.recurrenceMode == 1 } == true) {
+                    Text(
+                        text = "Renews automatically. Cancel anytime in Google Play.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
                 }
 
                 if (config.settings.showRestore) {

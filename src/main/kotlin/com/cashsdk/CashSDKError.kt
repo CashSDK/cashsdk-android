@@ -28,6 +28,18 @@ sealed class CashSDKError(
     /** User dismissed the Google purchase sheet — not an error to surface as failure UI. */
     data object PurchaseCancelled : CashSDKError("Purchase cancelled by user")
 
+    // Do not add subclasses without a source-breaking release: merchants exhaustively
+    // match this sealed hierarchy. New conditions use the existing structured variants.
+    internal companion object {
+        fun InvalidPurchaseOptions(reason: String) = Billing(5, reason)
+        val PurchaseBelongsToAnotherAccount = Server(200, "purchase_belongs_to_another_account")
+        val PurchaseInProgress = Billing(5, "A purchase is already in progress")
+        val ProductTypeUnknown = Decoding(IllegalStateException("The verified response has no supported catalog product type; settlement remains pending"))
+        fun BillingTimeout(operation: String) = Network(java.util.concurrent.TimeoutException(
+            "Google Play timed out during $operation. Payment may still complete; check purchases before buying again.",
+        ))
+    }
+
     /**
      * Deferred purchase (pending/parental approval/SCA). Resolution arrives later.
      *
@@ -46,7 +58,7 @@ sealed class CashSDKError(
      * completed sale.
      */
     data object PurchaseNotAttributed :
-        CashSDKError("Purchase could not be attributed to a user — call identify(userId, userToken) and retry")
+        CashSDKError("Purchase could not be attributed to a user. Call identify(userId, userToken) and retry")
 
     /**
      * A Google Play Billing call failed. [responseCode] is a `BillingClient.BillingResponseCode`.
@@ -68,14 +80,18 @@ sealed class CashSDKError(
         CashSDKError(
             "${explainBillingCode(responseCode)} (Play Billing code $responseCode)" +
                 explainBillingSubResponseCode(subResponseCode) +
-                (debug?.takeIf { it.isNotBlank() }?.let { " — Play says: $it" } ?: ""),
+                (debug?.takeIf { it.isNotBlank() }?.let { ". Play says: $it" } ?: ""),
         )
 
     /** Transport failure (no connectivity, timeout, TLS). Reads degrade to cache; writes queue. */
     data class Network(val underlying: Throwable) :
         CashSDKError("Network error: ${underlying.message}", underlying)
 
-    /** Non-2xx HTTP response. [code] is the server error code from the JSON body when present. */
+    /**
+     * A server refusal. Usually non-2xx; status 200 with code
+     * `purchase_belongs_to_another_account` represents a recorded receipt that granted no
+     * ownership to this caller. [status] retains the actual HTTP status, not an invented one.
+     */
     data class Server(val status: Int, val code: String? = null, val body: String? = null) :
         CashSDKError("Server error $status${code?.let { " ($it)" } ?: ""}")
 
@@ -95,10 +111,10 @@ sealed class CashSDKError(
  * dependency-free and usable from tests that do not pull in the billing client.
  */
 internal fun explainBillingCode(code: Int): String = when (code) {
-    -3 -> "Google Play did not respond in time. Transient — retry."
+    -3 -> "Google Play did not respond in time. Transient, so retry."
     -2 -> "This device's Google Play Billing version does not support the feature requested. " +
         "Subscriptions with base plans and offers need Play Billing 5+ on a current Play Store."
-    -1 -> "The connection to Google Play was lost. The SDK reconnects automatically — retry the call."
+    -1 -> "The connection to Google Play was lost. The SDK reconnects automatically, so retry the call."
     1 -> "The user cancelled the purchase."
     2 -> "Google Play Billing is temporarily unavailable (usually a network problem on the device)."
     3 -> "Google Play Billing is unavailable on this device or for this account. Common causes: " +
@@ -118,16 +134,16 @@ internal fun explainBillingCode(code: Int): String = when (code) {
         "existing purchase up and grant the entitlement, rather than starting a new purchase."
     8 -> "This account does not own that product, so it cannot be consumed or acknowledged. " +
         "Usually means the purchase was already settled."
-    12 -> "Google Play could not read the network. Transient — retry."
+    12 -> "Google Play could not read the network. Transient, so retry."
     else -> "Google Play Billing returned an unexpected result."
 }
 
 /** Billing 9 supplies these alongside the top-level response code for purchase-flow failures. */
 internal fun explainBillingSubResponseCode(code: Int): String = when (code) {
     0 -> ""
-    1 -> " — Payment was declined because the account has insufficient funds. Ask the user " +
+    1 -> ". Payment was declined because the account has insufficient funds. Ask the user " +
         "to update or choose another Play payment method."
-    2 -> " — This account is not eligible for the selected subscription offer. Refresh the " +
+    2 -> ". This account is not eligible for the selected subscription offer. Refresh the " +
         "product details and present an offer returned for this account."
-    else -> " — Play Billing sub-response code $code."
+    else -> ". Play Billing sub-response code $code."
 }

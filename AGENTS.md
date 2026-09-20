@@ -1,9 +1,36 @@
 # AGENTS.md — integrating CashSDK for Android
 
+> Midgame candidate: see [1.3.0-rc.1](RELEASE-CANDIDATE.md). It adds awaited
+> `refreshEntitlements()`, purchase confirmation/identity metadata, and pre-purchase
+> token checks. The stable Maven Central examples below still describe 1.2.0.
+
 Instructions for coding agents (Claude Code, Cursor, Codex, Copilot, …) adding CashSDK to an
 Android app. Everything here is verified against the source in this repository at tag `1.2.0`.
 Prefer it over anything you recall about this SDK — several symbols have look-alike names in
 other IAP SDKs, and guessing them produces code that does not compile.
+
+Unreleased source changes (2026-09-11): request identity is atomic, automatic recovery
+includes acknowledged purchases only when their canonical account token matches the
+signed-in user, sync is serialized, and failed Play queries throw. Explicit
+`restoreDetailed()` handles legacy/foreign-token migration under the server restore policy.
+These changes are not in the published `1.2.0` dependency below.
+
+Unreleased source changes (2026-09-12): exact offer selection, subscription replacement,
+live product/phase discovery, bounded billing waits and guarded restore. Use only with
+the source module until a release is published. Existing purchase signatures remain.
+
+```kotlin
+// Additional SOURCE APIs; not present in Maven Central 1.2.0.
+suspend purchase(activity: Activity, productId: String, options: PurchaseOptions,
+                 kind: PurchaseKind = PurchaseKind.SUBSCRIPTION): Entitlements
+suspend products(ids: List<String>): List<com.cashsdk.billing.StoreProduct>
+```
+
+Unreleased source changes (2026-09-19): ambiguous base plans now throw;
+`StoreProduct.defaultPrice` is nullable. Always pass the displayed base plan/offer token.
+
+See [README purchase options](README.md#unreleased-purchase-options) for defaults and
+cross-product replacement. A timeout or verification error does not prove no charge occurred.
 
 ## What this package does
 
@@ -200,7 +227,7 @@ These are correctness requirements, not style preferences. Each one has a money 
 ```bash
 export ANDROID_HOME=$HOME/Library/Android/sdk    # or your SDK path
 echo "sdk.dir=$ANDROID_HOME" > local.properties  # not committed
-./gradlew testDebugUnitTest assembleRelease      # 55 tests + the .aar
+./gradlew testDebugUnitTest assembleRelease      # 87 tests + the .aar
 ```
 
 Purchases themselves need a real device, a signed build uploaded to a Play testing track, and a
@@ -221,5 +248,5 @@ Full docs: <https://docs.cashsdk.com/sdk/android>. Keys: <https://app.cashsdk.co
 
 ## Status — say this plainly if asked
 
-Compile- and unit-verified (55 tests, `.aar` builds). **Not yet exercised on real hardware or
+Compile- and unit-verified (87 tests, `.aar` builds). **Not yet exercised on real hardware or
 against a live Play Billing purchase.** Recommend a device pass before a production launch.

@@ -93,6 +93,10 @@ data class Entitlements(
      * very next read. [CashSDKClient] adopts it and stamps `X-CashSDK-Environment` thereafter.
      */
     val environment: String? = null,
+    /** Identity echoed by the server; absence must not confirm a purchase. */
+    val userId: String? = null,
+    /** True only when the verified purchase granted its mapped access. */
+    val purchaseOutcomeConfirmed: Boolean? = null,
 ) {
     /** Fast gating check used by host apps: is this entitlement currently active? */
     fun isActive(identifier: String): Boolean = active.any { it.identifier == identifier }
@@ -367,6 +371,20 @@ data class ConsumableSpendResult(
 
 /** One slot's underlying store product. `identifier` is what you pass to `purchase`. */
 @Serializable
+data class CatalogIntroductoryOffer(
+    val id: String,
+    val offerType: String? = null,
+    val period: String? = null,
+    val numberOfPeriods: Int? = null,
+    val territory: String? = null,
+    val startDate: String? = null,
+    val endDate: String? = null,
+    val price: Int? = null,
+    val pricePointId: String? = null,
+)
+
+/** Catalog metadata is not a statement of this buyer's eligibility. */
+@Serializable
 data class PackageProduct(
     val id: String,
     val identifier: String,
@@ -377,6 +395,12 @@ data class PackageProduct(
     val price: Int? = null,
     val currency: String? = null,
     val displayName: String? = null,
+    val basePlanId: String? = null,
+    val trialPeriod: String? = null,
+    val trialPrice: Int? = null,
+    val introductoryOffers: List<CatalogIntroductoryOffer>? = null,
+    val offerSyncStatus: String? = null,
+    val eligibility: String? = null,
 )
 
 /** One slot in an offering: `$monthly` | `$annual` | `$lifetime` | a custom id. */

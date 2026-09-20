@@ -22,6 +22,7 @@ import com.cashsdk.net.VerifyDecision
 import com.cashsdk.paywall.PaywallActivity
 import com.cashsdk.paywall.PaywallPresentation
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -62,6 +63,9 @@ object CashSDK {
     /**
      * Initialize the SDK. Safe to call once (typically from `Application.onCreate`).
      * @param apiBase override the REST base (default `https://api.cashsdk.com`) for dev/staging.
+     * @param publishableKey the app's `csk_pk_…`. One key per app, and it works in every
+     *   environment: an internal-testing install runs the same APK as the Play listing, so
+     *   there is no build-time split to get right. Safe to ship in the APK.
      * @param environment pin the store environment (`"Sandbox"` / `"Production"`), mirroring
      *   `CashSDK.configure(publishableKey:apiBase:environment:)` on iOS. Leave null to let the
      *   SDK learn it from the server's verify response — Play Billing cannot tell the client
@@ -112,7 +116,23 @@ class CashSDKClient internal constructor(
     /** A host-pinned environment is authoritative — never overridden by what the server says. */
     private val pinnedEnvironment: String? = config.environment
 
-    private val store = EntitlementStore(appContext, config.environment)
+    /**
+     * Where the environment learned from a verify response survives a relaunch.
+     *
+     * It has to survive: a consumed consumable never comes back from `queryPurchasesAsync`,
+     * so a licence tester whose only purchases are coin packs re-verifies nothing on the next
+     * launch and the SDK would forget it is in Sandbox. Balances are per environment
+     * server-side, so that forgetting reads back as "my coins are gone". The environment of
+     * an install never changes, so remembering it is always right.
+     */
+    private val environmentPrefs = appContext.applicationContext
+        .getSharedPreferences("cashsdk_environment", Context.MODE_PRIVATE)
+
+    private val rememberedEnvironment: String? = pinnedEnvironment
+        ?: environmentPrefs.getString(KEY_OBSERVED_ENVIRONMENT, null)
+            ?.takeIf { it == "Sandbox" || it == "Production" }
+
+    private val store = EntitlementStore(appContext, rememberedEnvironment)
     private val api = ApiClient(appContext, config, entitlementEtag = { store.etag })
     private val billing = BillingManager(
         appContext,
@@ -144,10 +164,12 @@ class CashSDKClient internal constructor(
     private var foregroundObserver: Application.ActivityLifecycleCallbacks? = null
 
     init {
+        // The environment a previous run learned, so the first request of this run carries it
+        // and the cache is keyed to the right one before it is hydrated.
+        if (pinnedEnvironment == null && rememberedEnvironment != null) api.environment = rememberedEnvironment
         // Restore identity + hydrate cached entitlements so gating is correct offline on launch.
         val persistedUserId = identityStore.getString(KEY_USER_ID)
-        api.userId = persistedUserId
-        api.userToken = identityStore.getString(KEY_USER_TOKEN)
+        api.setIdentity(persistedUserId, identityStore.getString(KEY_USER_TOKEN))
         store.hydrate(persistedUserId)
         // Drain whatever a previous run left on disk, and keep draining on every foreground.
         observeForeground()
@@ -186,8 +208,7 @@ class CashSDKClient internal constructor(
         require(userId.isNotBlank()) { "userId must not be blank" }
         identityStore.putString(KEY_USER_ID, userId)
         identityStore.putString(KEY_USER_TOKEN, userToken)
-        api.userId = userId
-        api.userToken = userToken
+        api.setIdentity(userId, userToken)
         // Re-key the cache to this user. The persisted record carries its owner AND the ETag that
         // describes it, so a cache belonging to anyone else yields EMPTY *and* no ETag — there is
         // no way to end up revalidating someone else's snapshot into a 304.
@@ -203,8 +224,7 @@ class CashSDKClient internal constructor(
     fun logout() {
         emit("logout")
         identityStore.remove(KEY_USER_ID, KEY_USER_TOKEN)
-        api.userId = null
-        api.userToken = null
+        api.setIdentity(null, null)
         // Drops the snapshot and the ETag that describes it together — they are one record, so
         // there is no way to leave an ETag behind that would 304 the next sign-in into EMPTY.
         store.clear()
@@ -225,8 +245,10 @@ class CashSDKClient internal constructor(
      *   (identify with a `userToken` first) — the purchase is kept, not settled, and retried.
      */
     suspend fun verifyPurchase(productId: String, purchaseToken: String, kind: PurchaseKind): Entitlements {
-        val owner = api.userId
+        val identity = api.identitySnapshot()
+        val owner = identity.userId
         val outcome = api.verifyPurchase(VerifyRequest(productId, purchaseToken, kind))
+        if (!api.isCurrentIdentity(identity)) throw CashSDKError.NotIdentified
         onNetworkSuccess() // connectivity is provably back — drain any telemetry backlog
         // Adopt the environment the server resolved this purchase into, BEFORE any of the
         // early returns below — a deferred purchase is still a Sandbox-or-Production fact, and
@@ -251,11 +273,12 @@ class CashSDKClient internal constructor(
                 throw CashSDKError.PurchaseNotAttributed
             }
             VerifyDecision.GRANTED -> Unit
+            VerifyDecision.OWNED_ELSEWHERE -> throw CashSDKError.PurchaseBelongsToAnotherAccount
         }
         // The purchase IS recorded server-side (so this still counts as success), but the snapshot
         // describes whoever was signed in when the request went out — don't cache it under a user
         // who signed in meanwhile.
-        if (api.userId == owner) store.update(owner, outcome.entitlements, outcome.etag)
+        store.update(owner, outcome.entitlements, outcome.etag)
         emit("purchase_verified", product = productId)
         return outcome.entitlements
     }
@@ -287,15 +310,18 @@ class CashSDKClient internal constructor(
      * every single verify. Use this when you need to tell the user the truth.
      */
     suspend fun restoreDetailed(): RestoreResult {
-        api.userId ?: throw CashSDKError.NotIdentified
+        val identity = api.identitySnapshot()
+        api.requireIdentity(identity)
         val outcomes = mutableListOf<RestoreOutcome>()
         for (owned in billing.queryOwnedPurchases()) {
+            api.requireIdentity(identity)
             // Re-verify, then FINISH the purchase. A purchase whose app died before the
             // acknowledge/consume call is still open — Play auto-refunds anything left
             // unacknowledged for 3 days, and an unconsumed consumable can never be
             // re-bought. The verify response tells us which of the two it needs.
             outcomes += runCatching {
                 val verified = verifyPurchase(owned.productId, owned.purchaseToken, owned.kind)
+                api.requireIdentity(identity)
                 if (verified.pending) {
                     RestoreOutcome(owned.productId, owned.purchaseToken, verified = false, settled = false)
                 } else {
@@ -310,10 +336,15 @@ class CashSDKClient internal constructor(
                     )
                 }
             }.getOrElse { error ->
+                if (error is CancellationException) throw error
                 RestoreOutcome(owned.productId, owned.purchaseToken, verified = false, settled = false, error = error)
             }
+            api.requireIdentity(identity)
         }
-        val snapshot = runCatching { refreshEntitlements() }.getOrElse { store.current }
+        api.requireIdentity(identity)
+        // Restore must not report success from an old cache after an offline/auth failure.
+        val snapshot = refreshEntitlements()
+        api.requireIdentity(identity)
         emit("restore", properties = mapOf("restored" to outcomes.size, "failed" to outcomes.count { it.error != null }))
         return RestoreResult(snapshot, outcomes)
     }
@@ -467,7 +498,25 @@ class CashSDKClient internal constructor(
         activity: Activity,
         productId: String,
         kind: PurchaseKind = PurchaseKind.SUBSCRIPTION,
-    ): Entitlements = billing.purchase(activity, productId, kind)
+    ): Entitlements = purchase(activity, productId, PurchaseOptions(), kind)
+
+    /** Buy a specific base plan/offer, or replace an explicitly selected owned subscription. */
+    @JvmOverloads
+    suspend fun purchase(
+        activity: Activity,
+        productId: String,
+        options: PurchaseOptions,
+        kind: PurchaseKind = PurchaseKind.SUBSCRIPTION,
+    ): Entitlements {
+        val identity = api.identitySnapshot()
+        api.requireValidUserToken(identity)
+        val result = billing.purchase(activity, productId, kind, options) { api.requireValidUserToken(identity) }
+        api.requireIdentity(identity)
+        return result
+    }
+
+    /** Live Play prices and offers for custom paywalls; no second BillingClient is required. */
+    suspend fun products(ids: List<String>): List<com.cashsdk.billing.StoreProduct> = billing.products(ids)
 
     // ── Consumables (one-time IAP) ────────────────────────────────────────────────
 
@@ -508,8 +557,8 @@ class CashSDKClient internal constructor(
 
     internal suspend fun paywallPrice(productId: String): ProductPrice? = billing.resolvePrice(productId)
 
-    internal suspend fun paywallPurchase(activity: Activity, productId: String, kind: PurchaseKind): Entitlements =
-        billing.purchase(activity, productId, kind)
+    internal suspend fun paywallPurchase(activity: Activity, price: ProductPrice): Entitlements =
+        purchase(activity, price.productId, PurchaseOptions(basePlanId = price.basePlanId, offerToken = price.offerToken), price.kind)
 
     internal fun track(
         event: String,
@@ -537,15 +586,20 @@ class CashSDKClient internal constructor(
         if (api.environment == environment) return
         api.environment = environment
         store.setEnvironment(environment, api.userId)
+        runCatching { environmentPrefs.edit().putString(KEY_OBSERVED_ENVIRONMENT, environment).apply() }
     }
 
-    private suspend fun refreshEntitlements(): Entitlements {
-        val owner = api.userId
+    /** Await a server-confirmed snapshot for the current identity. Throws if identity
+     * changes (including A → B → A) while the request is in flight. */
+    suspend fun refreshEntitlements(): Entitlements {
+        val identity = api.identitySnapshot()
+        api.requireIdentity(identity)
+        val owner = identity.userId
         val result = api.getEntitlements()
         onNetworkSuccess() // see verifyPurchase — a good round trip is the cheapest "we're online" signal
         // Identity changed while the read was in flight: this body describes the PREVIOUS user.
         // Caching it under the new id would hand user B user A's entitlements.
-        if (api.userId != owner) return store.current
+        api.requireIdentity(identity)
         return when (result) {
             is ApiClient.EntitlementsResult.Modified -> {
                 store.update(owner, result.entitlements, result.etag)
@@ -707,6 +761,8 @@ class CashSDKClient internal constructor(
 
     private companion object {
         const val KEY_USER_ID = "user_id"
+        /** `cashsdk_environment` pref: the store environment a previous run learned. */
+        const val KEY_OBSERVED_ENVIRONMENT = "observed_environment"
         const val KEY_USER_TOKEN = "user_token"
 
         /** Events per request. The server caps a batch at 500; stay well under it. */

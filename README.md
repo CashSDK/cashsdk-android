@@ -6,12 +6,54 @@ Play Billing 9. The Android counterpart to `docs/08-IOS-SDK.md`.
 
 > ### Status
 > The public API, the Billing 9 engine, the offline-first entitlement cache and the Compose
-> paywall renderer are implemented and covered by **55 unit tests** (`./gradlew
+> paywall renderer are implemented; the source has **86 unit tests** (`./gradlew
 > testDebugUnitTest`, green). `assembleRelease` produces the `.aar`. It has **not yet been
 > exercised on a real device or against a live Play Billing purchase** — see
 > [Status](#status) at the bottom for exactly what is done and what is still open.
 
 ---
+
+## Unreleased purchase options
+
+The following APIs exist in this source tree, **not in the published 1.2.0 dependency**.
+The original `purchase(activity, productId, kind)` remains available. Multiple base plans
+require explicit selection: an ambiguous default throws before the payment sheet.
+`StoreProduct.defaultPrice` is null when no unique base plan exists; display the selected
+offer's localized pricing phases. A trial is never selected implicitly.
+
+```kotlin
+val products = CashSDK.shared.products(listOf("pro"))
+val selected = products.single().offers.first { it.basePlanId == "monthly" && it.offerId == null }
+// Render selected.phases using Google's formatted price and billing periods.
+val entitlements = CashSDK.shared.purchase(
+    activity, "pro",
+    PurchaseOptions(basePlanId = selected.basePlanId, offerToken = selected.offerToken),
+)
+```
+
+Missing/conflicting offer selectors throw before the payment sheet. A same-product plan
+change includes the owned token automatically only for the current canonical app account.
+For a cross-product change, pass `oldPurchaseToken` from the owned purchase and choose a
+`SubscriptionReplacementMode` deliberately. CashSDK does not infer unrelated subscriptions
+as replacement targets. Same-product auto-renewing changes support WITHOUT_PRORATION or
+CHARGE_FULL_PRICE; prepaid changes require CHARGE_FULL_PRICE. See
+[Google's replacement rules](https://developer.android.com/google/play/billing/subscriptions).
+
+`products(ids)` returns live store details, all subscription offers and pricing phases;
+it does not return an owned-purchase list or cache offers indefinitely. Existing one-time
+products still use `PurchaseKind.PRODUCT`. Set `isOfferPersonalized` only when applicable.
+
+Purchase attempts are serialized by rejection, not queued. A timeout or verification
+failure may happen after payment: check/restore purchases before buying again. Both restore
+APIs now throw for a changed session or failed final refresh; detailed outcomes still report
+individual verify/settle failures. Unknown catalog types remain unsettled for retry.
+
+The published sealed `CashSDKError` hierarchy is preserved so existing exhaustive `when`
+handlers (including Simarik's) still compile. New conditions use existing variants:
+invalid options/in-progress use `Billing`, timeout uses `Network` with a `TimeoutException`,
+missing catalog type uses `Decoding`, and ownership refusal uses
+`Server(status = 200, code = "purchase_belongs_to_another_account")`. That 200 is the real
+HTTP status: the receipt was recorded, but this caller did not receive ownership.
 
 ## Requirements
 
@@ -32,6 +74,13 @@ host apps.
 ---
 
 ## Install
+
+> Unreleased source changes (2026-09-11): atomic request identity, owner-checked automatic
+> recovery (including acknowledged purchases), serialized sync and truthful query errors.
+> These changes are not in the published `1.2.0` install below. Automatic recovery only
+> processes purchases with the current user's canonical account token. Use explicit
+> `restoreDetailed()` for legacy/foreign-token migration; the server's restore policy still
+> decides ownership. Pass a fresh backend-signed user token before purchase or restore.
 
 ### Option A — Gradle dependency (recommended)
 
@@ -154,7 +203,7 @@ Play update — verifies, credits and consumes/acknowledges it; the grant arrive
 `entitlementUpdates`. Do not tell the user the purchase failed.
 
 **Use `restoreDetailed()` when the UI reports success.** `restore()` returns the resulting
-snapshot and throws only if every purchase failed; `restoreDetailed()` gives per-purchase
+snapshot and throws if every purchase failed; `restoreDetailed()` gives per-purchase
 `verified` / `settled` / `error` so "Restore purchases" can tell the truth.
 
 ### Verifying a purchase (app-driven billing)
@@ -337,7 +386,7 @@ single-CTA hero rather than crashing.
 - **`SecureStore`** keeps identity material in the Android Keystore.
 - **Server `GET /v1/paywalls:resolve` is live** in `apps/api`; `register()` resolves against it
   and still degrades to "advance" on any failure.
-- **49 unit tests** (`./gradlew testDebugUnitTest`) over the wire contract, verify-response
+- **86 unit tests** (`./gradlew testDebugUnitTest`) over the wire contract, request identity, verify-response
   decoding, event-queue durability, and token derivation. `assembleRelease` builds the `.aar`.
 
 **Open:**
@@ -345,7 +394,8 @@ single-CTA hero rather than crashing.
 - **No device pass.** Everything above is compile- and unit-verified only. A real Play Billing
   purchase (verify → lifecycle → entitlement → webhook) and the Android Keystore paths still
   want a run on hardware before you rely on this in production.
-- **Not published to Maven Central** — see [Install](#install) Option A.
+- **This working tree is not released.** The published dependency in [Install](#install)
+  remains `1.2.0`; local source changes require a new SDK release and consumer upgrade.
 - **No instrumentation tests** and **no debug overlay** (iOS §7 parity).
 
 ---

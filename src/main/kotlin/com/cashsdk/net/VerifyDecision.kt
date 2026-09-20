@@ -26,6 +26,9 @@ internal enum class VerifyDecision {
      */
     UNATTRIBUTED,
 
+    /** Accepted receipt, but the restore policy withheld it from this app account. */
+    OWNED_ELSEWHERE,
+
     /** Credited to this user. Cache the snapshot and settle the purchase with Google. */
     GRANTED,
     ;
@@ -47,6 +50,7 @@ internal enum class VerifyDecision {
         fun of(attributed: Boolean, entitlements: Entitlements): VerifyDecision = when {
             entitlements.pending -> PENDING
             !attributed -> UNATTRIBUTED
+            entitlements.belongsToAnotherAccount -> OWNED_ELSEWHERE
             else -> GRANTED
         }
     }

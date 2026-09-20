@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- A Compose app supplies its own MaterialTheme, so the Android theme only needs to be a
-         no-action-bar platform base. Using a framework theme avoids a dependency on the
-         Material Components (Views) library, which the Compose-only SDK doesn't pull in. -->
-    <style name="Theme.CashSDKSample" parent="android:Theme.Material.Light.NoActionBar" />
-</resources>

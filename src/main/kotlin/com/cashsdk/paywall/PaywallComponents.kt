@@ -139,9 +139,12 @@ private fun PlanCard(
                 badge?.let {
                     Text(text = it, style = MaterialTheme.typography.labelSmall, color = accent)
                 }
+                price?.introText()?.let {
+                    Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Text(
-                text = price?.formattedPrice ?: "—",
+                text = price?.priceText() ?: "—",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -184,11 +187,14 @@ internal fun FeatureListBody(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = price?.formattedPrice ?: "—",
+                    text = price?.priceText() ?: "—",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+            }
+            price?.introText()?.let {
+                Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -206,13 +212,16 @@ private fun FeatureRow(text: String, accent: Color) {
 @Composable
 internal fun CenteredHeroBody(primaryPrice: ProductPrice?) {
     // Hero art slot is host-provided in a full build; the scaffold shows the resolved price.
-    primaryPrice?.formattedPrice?.takeIf { it.isNotBlank() }?.let {
+    primaryPrice?.priceText()?.takeIf { it.isNotBlank() }?.let {
         Text(
             text = it,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
         )
+    }
+    primaryPrice?.introText()?.let {
+        Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
