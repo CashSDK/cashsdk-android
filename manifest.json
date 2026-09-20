@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "c5e1d9d579e1d967ddb8d9d91fce48d304bf264d",
+  "version": "1.3.0-rc.1",
+  "files": {
+    "com/cashsdk/cashsdk-android/1.3.0-rc.1/cashsdk-android-1.3.0-rc.1-sources.jar": "1133d057f1f1eef325d696c264463239b11bd935ee650c002350ecbeb732d60c",
+    "com/cashsdk/cashsdk-android/1.3.0-rc.1/cashsdk-android-1.3.0-rc.1.aar": "47ae91801da751085a9049f971cfd755f6ed4648cd427a632ed4719da68da791",
+    "com/cashsdk/cashsdk-android/1.3.0-rc.1/cashsdk-android-1.3.0-rc.1-javadoc.jar": "8e579001d95b9120fde434b6fc44a9e15a409dd3ffd00a68246d17741e4f9497",
+    "com/cashsdk/cashsdk-android/1.3.0-rc.1/cashsdk-android-1.3.0-rc.1.module": "330ee2d63f14951dac080a19969f1e9f5f94522a50cbeb03bb84108a4fdbe544",
+    "com/cashsdk/cashsdk-android/1.3.0-rc.1/cashsdk-android-1.3.0-rc.1.pom": "0a1d6935bd374e24b280c58ccfe2f296d78fc9f6c0817a11152554d7f711f9a2"
+  }
+}
