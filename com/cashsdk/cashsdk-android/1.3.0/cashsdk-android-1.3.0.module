@@ -1,0 +1,173 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.cashsdk",
+    "module": "cashsdk-android",
+    "version": "1.3.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14.3"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "cashsdk-android-1.3.0.aar",
+          "url": "cashsdk-android-1.3.0.aar",
+          "size": 570295,
+          "sha512": "707674ce07b51a39a06442798e8328b1f49b447e8678373f4559057c68dddd5c8fcd6347d10732a2daf065855c0af57c124aa286906b162a5a36f53942b42c7e",
+          "sha256": "62a4746efacca3a4db0a4a6b492a8e0e866ddf13de3c5950ab9137192bf0f3cb",
+          "sha1": "587f42a21ee8762409b722d9a1330accfb975c8b",
+          "md5": "c6b99c7899cd5b5e93346fd8e21dbfab"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-android",
+          "version": {
+            "requires": "1.9.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-serialization-json",
+          "version": {
+            "requires": "1.7.3"
+          }
+        },
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.13.1"
+          }
+        },
+        {
+          "group": "androidx.lifecycle",
+          "module": "lifecycle-runtime-ktx",
+          "version": {
+            "requires": "2.8.6"
+          }
+        },
+        {
+          "group": "androidx.lifecycle",
+          "module": "lifecycle-runtime-compose",
+          "version": {
+            "requires": "2.8.6"
+          }
+        },
+        {
+          "group": "com.android.billingclient",
+          "module": "billing-ktx",
+          "version": {
+            "requires": "9.1.0"
+          }
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui",
+          "version": {
+            "requires": "1.7.2"
+          }
+        },
+        {
+          "group": "androidx.compose.ui",
+          "module": "ui-tooling-preview",
+          "version": {
+            "requires": "1.7.2"
+          }
+        },
+        {
+          "group": "androidx.compose.foundation",
+          "module": "foundation",
+          "version": {
+            "requires": "1.7.2"
+          }
+        },
+        {
+          "group": "androidx.compose.material3",
+          "module": "material3",
+          "version": {
+            "requires": "1.3.0"
+          }
+        },
+        {
+          "group": "androidx.activity",
+          "module": "activity-compose",
+          "version": {
+            "requires": "1.9.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.20"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "cashsdk-android-1.3.0.aar",
+          "url": "cashsdk-android-1.3.0.aar",
+          "size": 570295,
+          "sha512": "707674ce07b51a39a06442798e8328b1f49b447e8678373f4559057c68dddd5c8fcd6347d10732a2daf065855c0af57c124aa286906b162a5a36f53942b42c7e",
+          "sha256": "62a4746efacca3a4db0a4a6b492a8e0e866ddf13de3c5950ab9137192bf0f3cb",
+          "sha1": "587f42a21ee8762409b722d9a1330accfb975c8b",
+          "md5": "c6b99c7899cd5b5e93346fd8e21dbfab"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "cashsdk-android-1.3.0-sources.jar",
+          "url": "cashsdk-android-1.3.0-sources.jar",
+          "size": 101337,
+          "sha512": "c53eff02feafe9d9dc337df36fdfec2755a14c0f0b18dce1560fface3a78f5357c10ff37002da8f637bbc839a5c28eaa77b9df644751ebda550bc63dd2d7764d",
+          "sha256": "55707e03883586b5c0fad81e4120f1aa0a9c6a48e8cedf683385f8e1b2620fd6",
+          "sha1": "54315ff540697a5d385714f4533dec47060761f1",
+          "md5": "ab4b60ae749c1ab2169b9e9aed3d91e5"
+        }
+      ]
+    }
+  ]
+}
