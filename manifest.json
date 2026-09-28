@@ -1,0 +1,13 @@
+{
+  "group": "com.cashsdk",
+  "artifact": "cashsdk-android",
+  "version": "1.4.0",
+  "sourceTag": "1.4.0",
+  "files": {
+    "cashsdk-android-1.4.0.module": "b65d895a3c7789eb7a7529dcdd27999a86584b104c16630ee10e8ac028e28a3e",
+    "cashsdk-android-1.4.0.pom": "3a02038ba5ff615f11698172a816ab46e88e77d9a8c5fc16e639582e4b481c54",
+    "cashsdk-android-1.4.0-sources.jar": "ba1973d389b838180125995133d448f51d8dd2cb56c0bcc1661347f6858f7a25",
+    "cashsdk-android-1.4.0-javadoc.jar": "e7a151fc1cc71b161f2bf1f427985108d30e51497d19f30965a84249cfdee779",
+    "cashsdk-android-1.4.0.aar": "d4b73bde0b1c51b7c708d4ee8aaa7512eb81eea11e2a3700af937d73a2fd74ff"
+  }
+}
